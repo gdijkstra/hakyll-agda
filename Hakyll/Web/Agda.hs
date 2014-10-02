@@ -4,10 +4,10 @@
 -- <http://code.haskell.org/Agda/LICENSE> for the license and the copyright
 -- information for that code.
 module Hakyll.Web.Agda
-    ( markdownAgda
-    , pandocAgdaCompilerWith
-    , pandocAgdaCompiler
-    ) where
+   ( markdownAgda
+   , pandocAgdaCompilerWith
+   , pandocAgdaCompiler
+   ) where
 
 import           Control.Applicative
 import           Data.Char
@@ -151,16 +151,21 @@ convert classpr m =
     do (info, contents) <- getModule m
        return . toMarkdown classpr m . groupLiterate . pairPositions info $ contents
 
+-- old: runTCM :: TCMT IO a -> IO (Either TCErr a)
+-- new: runTCM :: MonadIO m => TCEnv -> TCState -> TCMT m a -> m (a, TCState)
+-- instantiate m with IO, we get
+-- nu': runTCM :: TCEnv -> TCState -> TCM IO a -> IO a 
 markdownAgda :: CommandLineOptions -> String -> FilePath -> IO String
 markdownAgda opts classpr fp =
-    do r <- TCM.runTCM $ catchError (TCM.setCommandLineOptions opts >>
-                                     checkFile (mkAbsolute fp) >>= convert classpr)
+    let asdf :: TCM String
+        asdf = catchError (TCM.setCommandLineOptions opts >> checkFile (mkAbsolute fp) >>= convert classpr)
                        $ \err -> do s <- prettyError err
                                     liftIO (putStrLn s)
                                     throwError err
-       case r of
-           Right s -> return (dropWhile isSpace s)
-           Left _  -> exitFailure
+    in do (r, _) <- TCM.runTCM TCM.initEnv TCM.initState asdf
+          return (dropWhile isSpace r)
+--              Right s -> return (dropWhile isSpace s)
+--              Left _  -> exitFailure
 
 isAgda :: Item a -> Bool
 isAgda i = ex == ".lagda"
